@@ -7,14 +7,14 @@ def main():
     for index in range(7):
 
         # Path to the directory containing images
-        image_folder = f'output/sensor.camera.dvs/{index}'
-        label_folder = f'output/labels/{index}'
+        image_folder = f'output/sensor.camera.optical_flow/{index}'
+        label_folder = f'output/labels_3d/{index}'
 
         # label_folder = "/media/apg/f67e28c6-a968-4bc0-adbe-5c4d7fc75007/ktan24_dataset/yolodataset/val/intersection_4_night_val/rgb_labels"
         # image_folder = "/media/apg/f67e28c6-a968-4bc0-adbe-5c4d7fc75007/ktan24_dataset/yolodataset/val/intersection_4_night_val/images"
         # Path and name of the output video file
         # video_filename = 'rgb_output_video.avi'
-        video_filename = f'videos/{index+7}.avi'
+        video_filename = f'videos/{index+7*4}.avi'
         # Desired frame rate of the video
         frame_rate = 30
 
@@ -44,7 +44,7 @@ def main():
 
             # show_bbox.draw_frame(img_path label_path)
             # frame = cv2.imread(img_path)
-            video.write(show_bbox_api.draw_frame(img_path, label_path))
+            video.write(show_bbox_api.draw_frame_3d(img_path, label_path))
             # video.write(frame)
         # Release the video writer object
         video.release()

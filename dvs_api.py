@@ -52,9 +52,9 @@ def dvs_callback_csv(data, dvs_output_path): # store in csv file
     with open(dvs_output_path, mode="a",  newline='') as file:
         writer = csv.writer(file)
         for event in dvs_event_copy:
-            # combine = event.tolist()
+    #         # combine = event.tolist()
 
-            # print("event: ", event)
+    #         # print("event: ", event)
             writer.writerow(event)
         file.close()
     return dvs_event_copy[0]['t']
@@ -63,3 +63,11 @@ def dvs_callback_csv(data, dvs_output_path): # store in csv file
 # time.sleep(3)
 # dvs_camera.stop()
 # print("STOP")
+
+def dvs_callback(data, path):
+    dvs_output_path = path + "/dvs_output.csv"
+    timestamp = dvs_callback_csv(data, dvs_output_path)
+    image = dvs_callback_img(data)
+    cv2.imwrite(path + '/'+'%06d' % data.frame + ".png", image)
+
+    return timestamp

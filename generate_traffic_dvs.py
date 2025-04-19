@@ -97,6 +97,7 @@ def get_image_point(loc, K, w2c):
         point_img[1] /= point_img[2]
 
         return point_img[0:2]
+
 def point_in_canvas(pos, img_h, img_w):
     """Return true if point is in canvas"""
     if (pos[0] >= 0) and (pos[0] < img_w) and (pos[1] >= 0) and (pos[1] < img_h):
@@ -112,6 +113,18 @@ def clip_bbox_to_screen(x_min, y_min, x_max, y_max, img_width, img_height):
     x_max = max(0, min(img_width , x_max))
     y_max = max(0, min(img_height , y_max))
     return x_min, y_min, x_max, y_max
+
+def dvs_callback(data): #store in image
+    dvs_events = np.frombuffer(data.raw_data, dtype=np.dtype([
+        ('x', np.uint16), ('y',np.uint16), ('t',np.int64), ('pol', np.bool)]))
+    # data_dict['dvs_image'] = np.zeros((data.height, data.weight, 4), dtype=np.uint8)
+
+    # dvs_img = np.zeros((data.height, data.width, 3), dtype=np.uint8)
+    # dvs_img[dvs_events[:]['y'],dvs_events[:]['x'],dvs_events[:]['pol']*2] = 255
+
+    # print(dvs_events[0]['t'], dvs_events[-1]['t'], max(dvs_events[:]['t']), min(dvs_events[:]['t']))
+    # cv2.imwrite(f'dvs_output/{data.frame}.png', dvs_img)
+    return dvs_events
 def main():
     argparser = argparse.ArgumentParser(
         description=__doc__)
@@ -411,11 +424,12 @@ def main():
 
         # Example of how to use Traffic Manager parameters
         traffic_manager.global_percentage_speed_difference(30.0)
-        sensor_list = ["sensor.camera.rgb", 
-            "sensor.camera.semantic_segmentation",
-            "sensor.camera.instance_segmentation",
-            "sensor.camera.depth",
-            "sensor.camera.optical_flow"]
+        # sensor_list = ["sensor.camera.rgb", 
+        #     "sensor.camera.semantic_segmentation",
+        #     "sensor.camera.instance_segmentation",
+        #     "sensor.camera.depth",
+        #     "sensor.camera.optical_flow"]
+        sensor_list = ["sensor.camera.rgb", "sensor.camera.dvs"]
         # image_queue_1 = queue.Queue() 
         # image_queue_2 = queue.Queue() 
         # image_queue_3 = queue.Queue()
@@ -444,9 +458,13 @@ def main():
         optical_queue_list = []
         for i in range(7):
             optical_queue_list.append(queue.Queue())
-        total_queue_list = [rgb_queue_list, semantic_queue_list, instance_queue_list, depth_queue_list, optical_queue_list]
-        # time_queue = queue.Queue()
 
+        dvs_queue_list = []
+        for i in range(7):
+            dvs_queue_list.append(queue.Queue())
+
+        # total_queue_list = [rgb_queue_list, semantic_queue_list, instance_queue_list, depth_queue_list, optical_queue_list]
+        total_queue_list = [rgb_queue_list, dvs_queue_list]
         spectator = world.get_spectator()
         # transform = spectator.get_transform()
         # location = transform.location
@@ -465,7 +483,9 @@ def main():
         instance_camera_bp_list = []
         depth_camera_bp_list = []
         optical_camera_bp_list = []
-        total_camera_bp_list = [rgb_camera_bp_list, semantic_camera_bp_list, instance_camera_bp_list, depth_camera_bp_list, optical_camera_bp_list]
+        dvs_camera_bp_list = []
+        # total_camera_bp_list = [rgb_camera_bp_list, semantic_camera_bp_list, instance_camera_bp_list, depth_camera_bp_list, optical_camera_bp_list]
+        total_camera_bp_list = [rgb_camera_bp_list, dvs_camera_bp_list]
 
         for j, sensor in enumerate(sensor_list):
             camera_bp_list = total_camera_bp_list[j]
@@ -482,34 +502,6 @@ def main():
                 if i == 6:
                     camera_bp_list[i].set_attribute("image_size_x", "1280")
                     camera_bp_list[i].set_attribute("image_size_y", "720")
-
-        # camera_bp_1.set_attribute("image_size_x", "1280")
-        # camera_bp_1.set_attribute("image_size_y", "720")
-        # camera_bp_1.set_attribute("fov", "70")
-
-        # camera_bp_2.set_attribute("image_size_x", "1280")
-        # camera_bp_2.set_attribute("image_size_y", "720")
-        # camera_bp_2.set_attribute("fov", "70")
-
-        # camera_bp_3.set_attribute("image_size_x", "1280")
-        # camera_bp_3.set_attribute("image_size_y", "720")
-        # camera_bp_3.set_attribute("fov", "70")
-
-        # camera_bp_4.set_attribute("image_size_x", "1280")
-        # camera_bp_4.set_attribute("image_size_y", "720")
-        # camera_bp_4.set_attribute("fov", "70")
-
-        # camera_bp_5.set_attribute("image_size_x", "1280")
-        # camera_bp_5.set_attribute("image_size_y", "720")
-        # camera_bp_5.set_attribute("fov", "70")
-
-        # camera_bp_6.set_attribute("image_size_x", "1280")
-        # camera_bp_6.set_attribute("image_size_y", "720")
-        # camera_bp_6.set_attribute("fov", "110")
-
-        # camera_bp_7.set_attribute("image_size_x", "1280")
-        # camera_bp_7.set_attribute("image_size_y", "720")
-        # camera_bp_7.set_attribute("fov", "90") 
        
         # Night Mode
         print("Night Mode:", args.night)
@@ -518,8 +510,8 @@ def main():
                 sun_altitude_angle=-90.0
             )
             world.set_weather(weather)
-            raw_camera_bp.set_attribute("positive_threshold", "1.3")
-            raw_camera_bp.set_attribute("negative_threshold", "1.3")
+            # raw_camera_bp.set_attribute("positive_threshold", "1.3")
+            # raw_camera_bp.set_attribute("negative_threshold", "1.3")
 
 
         # camera_init_trans = carla.Transform(carla.Location(z=1.5))
@@ -557,26 +549,16 @@ def main():
         instance_camera_list = []
         depth_camera_list = []
         optical_camera_list = []
-        total_camera_list = [rgb_camera_list, semantic_camera_list, instance_camera_list, depth_camera_list, optical_camera_list]
-        
+        dvs_camera_list = []
+        # total_camera_list = [rgb_camera_list, semantic_camera_list, instance_camera_list, depth_camera_list, optical_camera_list]
+        total_camera_list = [rgb_camera_list, dvs_camera_list]
+
         for j, camera_list in enumerate(total_camera_list):
             for i in range(7):
                 camera_list.append(world.spawn_actor(total_camera_bp_list[j][i], camera_transform_list[i], attach_to=ego))
 
-
-        # camera_1 = world.spawn_actor(camera_bp_1, camera_transform_1, attach_to=ego)
-        # camera_2 = world.spawn_actor(camera_bp_2, camera_transform_2, attach_to=ego)
-        # camera_3 = world.spawn_actor(camera_bp_3, camera_transform_3, attach_to=ego)
-        # camera_4 = world.spawn_actor(camera_bp_4, camera_transform_4, attach_to=ego)
-        # camera_5 = world.spawn_actor(camera_bp_5, camera_transform_5, attach_to=ego)
-        # camera_6 = world.spawn_actor(camera_bp_6, camera_transform_6, attach_to=ego)
-        # camera_7 = world.spawn_actor(camera_bp_7, camera_transform_7, attach_to=ego)
-
-        # raw_camera = world.spawn_actor(raw_camera_bp, camera_init_trans, attach_to=spectator)
-
-
         # Get the world to camera matrix
-        world_2_camera = np.array(rgb_camera_list[0].get_transform().get_inverse_matrix())
+        # world_2_camera = np.array(rgb_camera_list[0].get_transform().get_inverse_matrix())
 
         # Get the attributes from the camera
         image_w = 1280
@@ -602,6 +584,15 @@ def main():
             for i in range(7):
                 if not os.path.exists(output_path + sensor + f"/{i}"):
                     os.makedirs(output_path + sensor + f"/{i}")
+                if sensor == "sensor.camera.dvs":
+                    with open(output_path + sensor + f"/{i}" + "/dvs_output.csv", mode="w",  newline='') as csvfile:
+                        writer = csv.writer(csvfile)
+                        writer.writerow(['x', 'y', 't', 'pol'])
+                        csvfile.close()
+                    with open(output_path + sensor + f"/{i}" + "/bbox.csv" , "w", encoding = "utf-8") as file:
+                        writer = csv.writer(file)
+                        writer.writerow(['t', 'x', 'y', 'w', 'h', 'class_id','class_confidence'])
+                        file.close()
             print("make dir: " + output_path + sensor)
         for i in range(7):
             if not os.path.exists(output_path + label_path + f"/{i}"):
@@ -646,13 +637,27 @@ def main():
         #     file.close()
         # world.tick()
         # raw_camera.listen(lambda data: time_queue.put(dvs_api.dvs_callback_csv(data, dvs_output_path)))
+
+        # for j, camera_list in enumerate(total_camera_list):
+        #     image_queue_list = total_queue_list[j]
+        #     for i, camera in enumerate(camera_list):
+        #         camera.listen(image_queue_list[i].put)
+        world.tick()
         for j, camera_list in enumerate(total_camera_list):
             image_queue_list = total_queue_list[j]
             for i, camera in enumerate(camera_list):
-                # if j == 3:
-                #     camera.listen(image_queue_list[i].put, carla.ColorConverter.LogarithmicDepth)
                 camera.listen(image_queue_list[i].put)
 
+                # if j == 0:
+                #     camera.listen(image_queue_list[i].put)
+                # if j == 1:
+                #     dvs_output_path = output_path + sensor + f"/{i}"
+                #     camera.listen(lambda data, index=i: 
+                #                 image_queue_list[index].put(dvs_events(data)))
+        if args.asynch or not synchronous_master:
+            world.wait_for_tick()
+        else:
+            world.tick()
         # camera_1.listen(image_queue_1.put)
         # camera_2.listen(image_queue_2.put)
         # camera_3.listen(image_queue_3.put)
@@ -662,7 +667,7 @@ def main():
         # camera_7.listen(image_queue_7.put)
         edges = [[0,1], [1,3], [3,2], [2,0], [0,4], [4,5], [5,1], [5,7], [7,6], [6,4], [6,2], [7,3]]
 
-        world.tick()
+        print("Queue empty before main loop?", dvs_queue_list[0].empty())
         times = 0
         while True:
             # print(times)
@@ -671,6 +676,8 @@ def main():
                 world.tick()
             else:
                 world.wait_for_tick()
+            if dvs_queue_list[0].empty():
+                print("Queue empty, ERROR")
 
             # world_2_camera_0 = np.array(rgb_camera_list[0].get_transform().get_inverse_matrix())
             # world_2_camera_1 = np.array(rgb_camera_list[1].get_transform().get_inverse_matrix())
@@ -689,14 +696,14 @@ def main():
             bboxes_6 = []
             bboxes_list = [bboxes_0, bboxes_1, bboxes_2, bboxes_3, bboxes_4, bboxes_5, bboxes_6]
 
-            bboxes_3d_0 = []
-            bboxes_3d_1 = []
-            bboxes_3d_2 = []
-            bboxes_3d_3 = []
-            bboxes_3d_4 = []
-            bboxes_3d_5 = []
-            bboxes_3d_6 = []
-            bboxes_3d_list = [bboxes_3d_0, bboxes_3d_1, bboxes_3d_2, bboxes_3d_3, bboxes_3d_4, bboxes_3d_5, bboxes_3d_6]
+            # bboxes_3d_0 = []
+            # bboxes_3d_1 = []
+            # bboxes_3d_2 = []
+            # bboxes_3d_3 = []
+            # bboxes_3d_4 = []
+            # bboxes_3d_5 = []
+            # bboxes_3d_6 = []
+            # bboxes_3d_list = [bboxes_3d_0, bboxes_3d_1, bboxes_3d_2, bboxes_3d_3, bboxes_3d_4, bboxes_3d_5, bboxes_3d_6]
 
             for npc in world.get_actors().filter('*vehicle*'):
                 if npc.id != ego.id:
@@ -757,33 +764,31 @@ def main():
                                 # if w_normal > 0 and h_normal > 0:
                                     bboxes_list[i].append(('0', x_normal, y_normal, w_normal, h_normal))
 
-                                temp_bbox = []
-                                for edge in edges:
-                                    p1 = get_image_point(verts[edge[0]], K, world_2_camera)
-                                    p2 = get_image_point(verts[edge[1]],  K, world_2_camera)
+                                # temp_bbox = []
+                                # for edge in edges:
+                                #     p1 = get_image_point(verts[edge[0]], K, world_2_camera)
+                                #     p2 = get_image_point(verts[edge[1]],  K, world_2_camera)
 
-                                    p1_in_canvas = point_in_canvas(p1, image_h, image_w)
-                                    p2_in_canvas = point_in_canvas(p2, image_h, image_w)
+                                #     p1_in_canvas = point_in_canvas(p1, image_h, image_w)
+                                #     p2_in_canvas = point_in_canvas(p2, image_h, image_w)
 
-                                    if not p1_in_canvas and not p2_in_canvas:
-                                        continue
+                                #     if not p1_in_canvas and not p2_in_canvas:
+                                #         continue
 
-                                    ray0 = verts[edge[0]] - camera.get_transform().location
-                                    ray1 = verts[edge[1]] - camera.get_transform().location
-                                    cam_forward_vec = camera.get_transform().get_forward_vector()
+                                #     ray0 = verts[edge[0]] - camera.get_transform().location
+                                #     ray1 = verts[edge[1]] - camera.get_transform().location
+                                #     cam_forward_vec = camera.get_transform().get_forward_vector()
 
-                                    # One of the vertex is behind the camera
-                                    if not (cam_forward_vec.dot(ray0) > 0):
-                                        p1 = get_image_point(verts[edge[0]], K_b, world_2_camera)
-                                    if not (cam_forward_vec.dot(ray1) > 0):
-                                        p2 = get_image_point(verts[edge[1]], K_b, world_2_camera)
-                                    temp_bbox.append(((int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]))))
-                                    # cv2.line(img, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), (255,0,0, 255), 1)   
-                                if temp_bbox != []:
-                                    bboxes_3d_list[i].append(('0', temp_bbox))
+                                #     # One of the vertex is behind the camera
+                                #     if not (cam_forward_vec.dot(ray0) > 0):
+                                #         p1 = get_image_point(verts[edge[0]], K_b, world_2_camera)
+                                #     if not (cam_forward_vec.dot(ray1) > 0):
+                                #         p2 = get_image_point(verts[edge[1]], K_b, world_2_camera)
+                                #     temp_bbox.append(((int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]))))
+                                # if temp_bbox != []:
+                                #     bboxes_3d_list[i].append(('0', temp_bbox))
                                 # bboxes_3d_list[i].append(('0', temp_bbox))
-                        #                     # if velocity >=0.1:
-            #                     #     bboxes_dvs.append([x_min, y_min, w, h, 2, 1.0])
+
 
             for npc in world.get_actors().filter('*pedestrian*'):
             #     # if npc.id != vehicle.id:
@@ -792,8 +797,6 @@ def main():
                     if dist < 50:
                         for i in range(7):
                             forward_vec = rgb_camera_list[i].get_transform().get_forward_vector()
-                            # ray = npc.get_transform().location - rgb_camera_list[i].get_transform().location
-                #  total_camera_list           forward_vec = rgb_camera_list[i].get_transform().get_forward_vector()
                             ray = npc.get_transform().location - ego.get_transform().location
                             if forward_vec.dot(ray) > 0:
                                 # p1 = get_image_point(bb.location, K, world_2_camera)
@@ -833,73 +836,85 @@ def main():
 
                                     bboxes_list[i].append(('1', x_normal, y_normal, w_normal, h_normal))
                                 
-                                temp_bbox = []
-                                for edge in edges:
-                                    p1 = get_image_point(verts[edge[0]], K, world_2_camera)
-                                    p2 = get_image_point(verts[edge[1]],  K, world_2_camera)
+                                # temp_bbox = []
+                                # for edge in edges:
+                                #     p1 = get_image_point(verts[edge[0]], K, world_2_camera)
+                                #     p2 = get_image_point(verts[edge[1]],  K, world_2_camera)
 
-                                    p1_in_canvas = point_in_canvas(p1, image_h, image_w)
-                                    p2_in_canvas = point_in_canvas(p2, image_h, image_w)
+                                #     p1_in_canvas = point_in_canvas(p1, image_h, image_w)
+                                #     p2_in_canvas = point_in_canvas(p2, image_h, image_w)
 
-                                    if not p1_in_canvas and not p2_in_canvas:
-                                        continue
+                                #     if not p1_in_canvas and not p2_in_canvas:
+                                #         continue
 
-                                    ray0 = verts[edge[0]] - camera.get_transform().location
-                                    ray1 = verts[edge[1]] - camera.get_transform().location
-                                    cam_forward_vec = camera.get_transform().get_forward_vector()
+                                #     ray0 = verts[edge[0]] - camera.get_transform().location
+                                #     ray1 = verts[edge[1]] - camera.get_transform().location
+                                #     cam_forward_vec = camera.get_transform().get_forward_vector()
 
-                                    # One of the vertex is behind the camera
-                                    if not (cam_forward_vec.dot(ray0) > 0):
-                                        p1 = get_image_point(verts[edge[0]], K_b, world_2_camera)
-                                    if not (cam_forward_vec.dot(ray1) > 0):
-                                        p2 = get_image_point(verts[edge[1]], K_b, world_2_camera)
-                                    temp_bbox.append(((int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]))))
-                                    # cv2.line(img, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), (255,0,0, 255), 1)   
-                                if temp_bbox != []:
-                                    bboxes_3d_list[i].append(('1', temp_bbox))
+                                #     # One of the vertex is behind the camera
+                                #     if not (cam_forward_vec.dot(ray0) > 0):
+                                #         p1 = get_image_point(verts[edge[0]], K_b, world_2_camera)
+                                #     if not (cam_forward_vec.dot(ray1) > 0):
+                                #         p2 = get_image_point(verts[edge[1]], K_b, world_2_camera)
+                                #     temp_bbox.append(((int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]))))
+                                # if temp_bbox != []:
+                                #     bboxes_3d_list[i].append(('1', temp_bbox))
+
             # # Save the bounding boxes in the scene
             rgb_output_list = []
             semantic_output_list = []
             instance_output_list = []
             depth_output_list = []
             opitcal_output_list = []
-
-            output_list = [rgb_output_list, semantic_output_list, instance_output_list, depth_output_list, opitcal_output_list]
-            
+            dvs_output_list = []
+            # output_list = [rgb_output_list, semantic_output_list, instance_output_list, depth_output_list, opitcal_output_list]
+            output_list = [rgb_output_list, dvs_output_list]
 
             for i, image_queue_list in enumerate(total_queue_list):
-                image_output_list = output_list[i]
+                # image_output_list = output_list[i]
                 for img_queue in image_queue_list:
-                    # if i == 4:
-                    #     opt_image = img_queue.get()
-                    #     image_output_list.append(image)
-                    # else:
-                    image_output_list.append(img_queue.get())
-            # image_1 = image_queue_1.get()
-            # image_2 = image_queue_2.get()
-            # image_3 = image_queue_3.get()
-            # image_4 = image_queue_4.get()
-            # image_5 = image_queue_5.get()
-            # image_6 = image_queue_6.get()
-            # image_7 = image_queue_7.get()
+                    output_list[i].append(img_queue.get())
+                    # if img_queue.empty() != True:
+                    #     output_list[i].append(img_queue.get())
 
             frame_path = '%06d' % output_list[0][0].frame
             for j, sensor in enumerate(sensor_list):
                 for i in range(7):
-                    # output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png') 
-                    if j == 1:  # semantic
-                        output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png', carla.ColorConverter.CityScapesPalette)                    
-                    elif j ==3:   # depth
-                        output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png', carla.ColorConverter.LogarithmicDepth)
-                    elif j == 4:  # optical flow
-                        opt_image = output_list[j][i].get_color_coded_flow()
-                        flow_array = np.frombuffer(opt_image.raw_data, dtype=np.uint8)
-                        flow_array = flow_array.reshape((opt_image.height, opt_image.width, 4))
-                        flow_array = flow_array[:, :, :3] 
-                        cv2.imwrite(output_path + sensor + f"/{i}/" + frame_path + '.png', cv2.cvtColor(flow_array, cv2.COLOR_RGB2BGR))
-                    else:
+                    # if j == 1:  # semantic
+            #             output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png', carla.ColorConverter.CityScapesPalette)                    
+            #         elif j ==3:   # depth
+            #             output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png', carla.ColorConverter.LogarithmicDepth)
+            #         elif j == 4:  # optical flow
+            #             opt_image = output_list[j][i].get_color_coded_flow()
+            #             flow_array = np.frombuffer(opt_image.raw_data, dtype=np.uint8)
+            #             flow_array = flow_array.reshape((opt_image.height, opt_image.width, 4))
+            #             flow_array = flow_array[:, :, :3] 
+                        # cv2.imwrite(output_path + sensor + f"/{i}/" + frame_path + '.png', cv2.cvtColor(flow_array, cv2.COLOR_RGB2BGR))
+            #         else:
+                    if j == 0:
                         output_list[j][i].save_to_disk(output_path + sensor + f"/{i}/" + frame_path + '.png')
-  
+                    elif j == 1:
+                        dvs_events = np.frombuffer(output_list[j][i].raw_data, dtype=np.dtype([
+                            ('x', np.uint16), ('y',np.uint16), ('t',np.int64), ('pol', np.bool)]))
+                        dvs_img = np.zeros((image_h, image_w, 3), dtype=np.uint8)
+                        dvs_img[dvs_events[:]['y'],dvs_events[:]['x'],dvs_events[:]['pol']*2] = 255
+                        cv2.imwrite(output_path + sensor + f"/{i}/" + frame_path + '.png', dvs_img)
+
+                        dvs_event_copy = dvs_events.copy()
+                        dvs_event_copy['t'] //= 1000
+                        with open(output_path + sensor + f"/{i}" + "/dvs_output.csv", mode="a",  newline='') as file:
+                            writer = csv.writer(file)
+                            for event in dvs_event_copy:
+                                writer.writerow(event)
+                            file.close()
+                        timestamp = dvs_event_copy[0]['t']
+                        bboxes = bboxes_list[i]
+                        with open(output_path + sensor + f"/{i}" + "/bbox.csv", "a", encoding = "utf-8") as file:
+                            writer = csv.writer(file)
+                            for bbox in bboxes:
+                                event = [timestamp] + [bbox[1], bbox[2], bbox[3], bbox[4], int(bbox[0]), 1.0]
+                                writer.writerow(event)
+                            file.close()
             # image_1.save_to_disk(output_path + image_path_1 + frame_path + '.png') 
             # image_2.save_to_disk(output_path + image_path_2 + frame_path + '.png')
             # image_3.save_to_disk(output_path + image_path_3 + frame_path + '.png')
@@ -917,28 +932,31 @@ def main():
                         # else:
                             # continue
                     file.close()
+
                 
-                bboxes_3d = bboxes_3d_list[i]
-                with open( output_path + label_3d_path + f"/{i}/" + frame_path+".txt", "w", encoding = "utf-8") as file3d:
-                    for bbox in bboxes_3d:
-                        # print(len(bbox))
-                        # if len(bbox) == 5:
-                        file3d.write(f"{bbox}\n")
-                        # else:
-                            # continue
-                    file3d.close()
-            # if time_queue.empty() != True:
-            #     timestamp = time_queue.get()
-            #     with open("output/bbox.csv", "a", encoding = "utf-8") as file:
-            #         writer = csv.writer(file)
-            #         for bbox in bboxes_dvs:
-            #             event = [timestamp] + bbox
-            #             writer.writerow(event)
-            #         file.close()
+                # bboxes_3d = bboxes_3d_list[i]
+                # with open( output_path + label_3d_path + f"/{i}/" + frame_path+".txt", "w", encoding = "utf-8") as file3d:
+                #     for bbox in bboxes_3d:
+                #         # print(len(bbox))
+                #         # if len(bbox) == 5:
+                #         file3d.write(f"{bbox}\n")
+                #         # else:
+                #             # continue
+                #     file3d.close()
+                # if total_queue_list[1][i].empty() != True:
+                #     # print(output_list[1])
+                #     # print(i)
+                #     timestamp = total_queue_list[1][i].get()
+                    # with open(output_path + sensor + f"/{i}" + "/bbox.csv", "a", encoding = "utf-8") as file:
+                    #     writer = csv.writer(file)
+                    #     for bbox in bboxes:
+                    #         event = [timestamp] + [bbox[1], bbox[2], bbox[3], bbox[4], int(bbox[0]), 1.0]
+                    #         writer.writerow(event)
+                    #     file.close()
 
             if times % 300 == 0:
                 print("times = ", times)
-            if times > 5:
+            if times > 300:
                 for camera_list in total_camera_list:
                     for camera in camera_list:
                         camera.stop()

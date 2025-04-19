@@ -5,7 +5,7 @@ import os
 
 name = "intersection_4_day_test"
 file = "test/"
-data = pd.read_csv('output/dvs_output.csv')
+data = pd.read_csv('output/sensor.camera.dvs/6/dvs_output.csv')
 
 
 if not os.path.exists(file):
@@ -29,7 +29,7 @@ dtype = np.dtype([
     ('class_id','<u4'),
     ('class_confidence','<f4'),
 ])
-bbox = np.genfromtxt('output/bbox.csv', delimiter = ',', skip_header = 1, dtype = dtype)
+bbox = np.genfromtxt('output/sensor.camera.dvs/6/bbox.csv', delimiter = ',', skip_header = 1, dtype = dtype)
 # structured_data = np.array(bbox, dtype=dtype)
 # print(structured_data)
 

@@ -1,11 +1,11 @@
 import cv2
 import numpy as np
 
-frame_rate = 10
+frame_rate = 30
 video_filename = 'combined_output_video.avi'
 
-video1 = cv2.VideoCapture("dvs_output_video.avi")
-video2 = cv2.VideoCapture("rgb_output_video.avi")
+video1 = cv2.VideoCapture("1.avi")
+video2 = cv2.VideoCapture("2.avi")
 
 w1 = int(video1.get(cv2.CAP_PROP_FRAME_WIDTH))
 h1 = int(video1.get(cv2.CAP_PROP_FRAME_HEIGHT))
